@@ -656,7 +656,7 @@ public class NextLevel: NSObject {
     public var devicePosition: NextLevelDevicePosition = .back {
         didSet {
             self.executeClosureAsyncOnSessionQueueIfNecessary {
-                self.configureSessionDevices()
+//                self.configureSessionDevices()
                 self.updateVideoOrientation()
             }
         }
@@ -744,6 +744,8 @@ public class NextLevel: NSObject {
     internal var _captureSession: AVCaptureSession?
     
     internal var _videoInput: AVCaptureDeviceInput?
+    internal var _frontCameraInput: AVCaptureDeviceInput?
+    internal var _backCameraInput: AVCaptureDeviceInput?
     internal var _audioInput: AVCaptureDeviceInput?
     
     internal var _videoOutput: AVCaptureVideoDataOutput?
@@ -762,6 +764,7 @@ public class NextLevel: NSObject {
     internal var _arConfiguration: NextLevelConfiguration?
     
     internal var _lastARFrame: CVPixelBuffer?
+    internal var isObserverAdded = false
     
     // MARK: - singleton
     
@@ -823,7 +826,8 @@ public class NextLevel: NSObject {
 // MARK: - authorization
 
 extension NextLevel {
-    
+  
+
     /// Checks the current authorization status for the desired media type.
     ///
     /// - Parameter mediaType: Specified media type (i.e. AVMediaTypeVideo, AVMediaTypeAudio, etc.)
@@ -1218,16 +1222,15 @@ extension NextLevel {
                 }
             }
             
-            let _ = self.addInput(session: session, device: captureDevice)
+            let _ = self.addInput(session: session, device: captureDevice,devicePosition: .front)
         }
     }
     
-    private func addInput(session: AVCaptureSession, device: AVCaptureDevice) -> Bool {
+    private func addInput(session: AVCaptureSession, device: AVCaptureDevice,devicePosition: NextLevelDevicePosition) -> Bool {
         do {
             let input = try AVCaptureDeviceInput(device: device)
             if session.canAddInput(input) {
                 session.addInput(input)
-                
                 if input.device.hasMediaType(AVMediaType.video) {
                     self.addKeyValueObservers(input.device)
                     self.updateVideoOutputSettings()
@@ -2081,13 +2084,46 @@ extension NextLevel {
     
     /// Triggers a camera device position change.
     public func flipCaptureDevicePosition() {
-        if self.devicePosition == .back {
-            self.devicePosition = .front
-        } else {
-            self.devicePosition = .back
+        switchCameraAnimation()
+        _captureSession?.stopRunning()
+        if self.devicePosition == .back{
+            do{
+              _captureSession?.removeInput(_videoInput!)
+                _videoInput = nil
+                try _videoInput = AVCaptureDeviceInput(device:AVCaptureDevice.primaryVideoDevice(forPosition: .front)!)
+                self._captureSession?.addInput(_videoInput!)
+                 self.updateVideoOrientation()
+                self._captureSession?.startRunning()
+               
+                self.devicePosition = .front
+            }
+            catch _ {
+               print("Capture Session Error")
+            }
+        }else{
+            do{
+                _captureSession?.removeInput(_videoInput!)
+                _videoInput = nil
+                try _videoInput = AVCaptureDeviceInput(device:AVCaptureDevice.primaryVideoDevice(forPosition: .back)!)
+                self._captureSession?.addInput(_videoInput!)
+                self.updateVideoOrientation()
+                self._captureSession?.startRunning()
+                self.devicePosition = .back
+            }
+            catch _ {
+                print("Capture Session Error")
+            }
         }
+        
     }
-    
+    func switchCameraAnimation() {
+        let filpAnimation = CATransition()
+        filpAnimation.duration = 0.1
+        filpAnimation.type = "oglFlip"
+        filpAnimation.subtype = kCATransitionFromRight
+        previewLayer.add(filpAnimation, forKey: "filpAnimation")
+    }
+
     /// Changes capture device if the desired device is available.
     public func changeCaptureDeviceIfAvailable(captureDevice: NextLevelDeviceType) throws {
         let deviceForUse = AVCaptureDevice.captureDevice(withType: captureDevice.avfoundationType, forPosition: .back)
@@ -2096,8 +2132,6 @@ extension NextLevel {
         } else {
             self.executeClosureAsyncOnSessionQueueIfNecessary {
                 self._requestedDevice = deviceForUse
-                self.configureSessionDevices()
-                self.updateVideoOrientation()
             }
         }
     }
@@ -2396,6 +2430,7 @@ extension NextLevel {
         if let session = self._recordingSession {
             if session.isReady == false {
                 session.beginClip()
+                
                 self.executeClosureAsyncOnMainQueueIfNecessary {
                     self.videoDelegate?.nextLevel(self, didStartClipInSession: session)
                 }
@@ -2469,6 +2504,7 @@ extension NextLevel {
                 }
                 
                 // when clients modify a frame using their rendering context, the resulting CVPixelBuffer is then passed in here with the original sampleBuffer for recording
+                
                 session.appendVideo(withSampleBuffer: sampleBuffer, customImageBuffer: self._sessionVideoCustomContextImageBuffer, minFrameDuration: device.activeVideoMinFrameDuration, completionHandler: { (success: Bool) -> Void in
                     // cleanup client rendering context
                     if self.isVideoCustomContextRenderingEnabled {
@@ -2540,7 +2576,7 @@ extension NextLevel {
             }
 
             // when clients modify a frame using their rendering context, the resulting CVPixelBuffer is then passed in here with the original sampleBuffer for recording
-            session.appendVideo(withPixelBuffer: pixelBuffer, customImageBuffer: self._sessionVideoCustomContextImageBuffer, timestamp: timestamp, minFrameDuration: CMTime(seconds: 1, preferredTimescale: 600), completionHandler: { (success: Bool) -> Void in
+            session.appendVideo(withPixelBuffer: pixelBuffer, customImageBuffer: self._sessionVideoCustomContextImageBuffer, timestamp: timestamp, minFrameDuration: CMTime(seconds: 1, preferredTimescale: 60), completionHandler: { (success: Bool) -> Void in
                 // cleanup client rendering context
                 if self.isVideoCustomContextRenderingEnabled {
                     if let imageBuffer = imageBuffer {
@@ -2565,7 +2601,7 @@ extension NextLevel {
             if session.currentClipHasVideo == false && (session.currentClipHasAudio == false || self.captureMode == .videoWithoutAudio) {
                 if let audioBuffer = self._lastAudioFrame {
                     let lastAudioEndTime = CMTimeAdd(CMSampleBufferGetPresentationTimeStamp(audioBuffer), CMSampleBufferGetDuration(audioBuffer))
-                    let videoStartTime = CMTime(seconds: timestamp, preferredTimescale: 600)
+                    let videoStartTime = CMTime(seconds: timestamp, preferredTimescale: 60)
 
                     if lastAudioEndTime > videoStartTime {
                         self.handleAudioOutput(sampleBuffer: audioBuffer, session: session)
@@ -2591,7 +2627,7 @@ extension NextLevel {
         
         if self._recording && session.isVideoReady && session.clipStarted && session.currentClipHasVideo {
             self.beginRecordingNewClipIfNecessary()
-            
+
             session.appendAudio(withSampleBuffer: sampleBuffer, completionHandler: { (success: Bool) -> Void in
                 if success {
                     self.executeClosureAsyncOnMainQueueIfNecessary {
@@ -3024,17 +3060,18 @@ extension NextLevel {
         currentDevice.addObserver(self, forKeyPath: "flashActive", options: [.new], context: &NextLevelFlashActiveObserverContext)
         currentDevice.addObserver(self, forKeyPath: "torchActive", options: [.new], context: &NextLevelTorchActiveObserverContext)
         currentDevice.addObserver(self, forKeyPath: "videoZoomFactor", options: [.new], context: &NextLevelVideoZoomFactorObserverContext)
+        isObserverAdded = true
     }
     
     internal func removeKeyValueObservers(_ currentDevice: AVCaptureDevice) {
-        currentDevice.removeObserver(self, forKeyPath: "adjustingFocus")
-        currentDevice.removeObserver(self, forKeyPath: "adjustingExposure")
-        currentDevice.removeObserver(self, forKeyPath: "adjustingWhiteBalance")
-        currentDevice.removeObserver(self, forKeyPath: "flashAvailable")
-        currentDevice.removeObserver(self, forKeyPath: "torchAvailable")
-        currentDevice.removeObserver(self, forKeyPath: "flashActive")
-        currentDevice.removeObserver(self, forKeyPath: "torchActive")
-        currentDevice.removeObserver(self, forKeyPath: "videoZoomFactor")
+//            currentDevice.removeObserver(self, forKeyPath: "adjustingFocus")
+//            currentDevice.removeObserver(self, forKeyPath: "adjustingExposure")
+//            currentDevice.removeObserver(self, forKeyPath: "adjustingWhiteBalance")
+//            currentDevice.removeObserver(self, forKeyPath: "flashAvailable")
+//            currentDevice.removeObserver(self, forKeyPath: "torchAvailable")
+//            currentDevice.removeObserver(self, forKeyPath: "flashActive")
+//            currentDevice.removeObserver(self, forKeyPath: "torchActive")
+//            currentDevice.removeObserver(self, forKeyPath: "videoZoomFactor")
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {

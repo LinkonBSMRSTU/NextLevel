@@ -128,11 +128,11 @@ extension AVCaptureDevice {
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: AVMediaType.video, position: position)
         for device in discoverySession.devices {
             if #available(iOS 11.0, *) {
-                if (device.deviceType == AVCaptureDevice.DeviceType.builtInDualCamera) {
+                if device.deviceType == AVCaptureDevice.DeviceType.builtInDualCamera {
                     return device
                 }
             } else {
-                if (device.deviceType == AVCaptureDevice.DeviceType.builtInDuoCamera) {
+                if device.deviceType == AVCaptureDevice.DeviceType.builtInDuoCamera {
                     return device
                 }
             }
@@ -235,7 +235,7 @@ extension AVCaptureDevice.Format {
     /// - Returns: `true` if the capture device format supports the given criteria, otherwise false
     public func isSupported(withFrameRate frameRate: CMTimeScale, dimensions: CMVideoDimensions = CMVideoDimensions(width: 0, height: 0)) -> Bool {
         let formatDimensions = CMVideoFormatDescriptionGetDimensions(self.formatDescription)
-        if (formatDimensions.width >= dimensions.width && formatDimensions.height >= dimensions.height) {
+        if formatDimensions.width >= dimensions.width && formatDimensions.height >= dimensions.height {
             for frameRateRange in self.videoSupportedFrameRateRanges {
                 if frameRateRange.minFrameDuration.timescale >= frameRate && frameRateRange.maxFrameDuration.timescale <= frameRate {
                     return true
