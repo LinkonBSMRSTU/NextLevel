@@ -223,7 +223,7 @@ public class NextLevelSession: NSObject {
         self._sessionQueue = DispatchQueue(label: NextLevelSessionQueueIdentifier)
         self._sessionQueue.setSpecific(key: NextLevelSessionSpecificKey, value: self._sessionQueue)
         self._sessionQueueKey = NextLevelSessionSpecificKey
-        
+
         super.init()
     }
     
@@ -384,27 +384,18 @@ extension NextLevelSession {
             }
             frameDuration = scaledDuration
         }
-       
+            print("here")
+        _videoQueue.async {
             if let videoInput = self._videoInput,
-                let _ = self._pixelBufferAdapter,
                 videoInput.isReadyForMoreMediaData {
-                
-                var bufferToProcess: CVPixelBuffer? = nil
-                if let customImageBuffer = customImageBuffer {
-                    bufferToProcess = customImageBuffer
-                } else {
-                    bufferToProcess = CMSampleBufferGetImageBuffer(sampleBuffer)
-                }
-                
-                _videoQueue.async {
-                    if let _ = bufferToProcess,(self._videoInput?.isReadyForMoreMediaData)! {
+                        print("append video")
                         self._videoInput?.append(sampleBuffer)
                         self._currentClipDuration = (offsetBufferTimestamp + frameDuration) - self._startTimestamp
                         self._lastVideoTimestamp = timestamp
                         self._currentClipHasVideo = true
                         completionHandler(true)
                         return
-                    }
+
                 }
         }
         
@@ -479,7 +470,8 @@ extension NextLevelSession {
             
             self._audioQueue.async {
                 if let audioInput = self._audioInput,
-                    audioInput.isReadyForMoreMediaData && audioInput.append(adjustedBuffer) {
+                    audioInput.isReadyForMoreMediaData && audioInput.append(sampleBuffer) {
+                    print("append audio")
                     self._lastAudioTimestamp = lastTimestamp
                     
                     if !self.currentClipHasVideo {
@@ -511,7 +503,7 @@ extension NextLevelSession {
             }
             frameDuration = scaledDuration
         }
-            _videoQueue.async {
+            _audioQueue.async {
                 if let audioInput = self._audioInput,
                     audioInput.isReadyForMoreMediaData {
                     self._audioInput?.append(sampleBuffer)
@@ -522,12 +514,9 @@ extension NextLevelSession {
                     return
                 }
             }
-            
-            
-        
-        
         completionHandler(false)
     }
+    
     /// Resets a session to the initial state.
     public func reset() {
         self.executeClosureSyncOnSessionQueueIfNecessary {
@@ -574,7 +563,7 @@ extension NextLevelSession {
     /// - Parameter completionHandler: Handler for when a clip is finalized or finalization fails
     public func endClip(completionHandler: NextLevelSessionEndClipCompletionHandler?) {
         self.executeClosureSyncOnSessionQueueIfNecessary {
-            self._videoQueue.async {
+            self._audioQueue.sync {
                 if self.clipStarted {
                     self._clipStarted = false
                     

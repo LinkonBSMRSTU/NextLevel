@@ -795,38 +795,14 @@ public class NextLevel: NSObject {
     }
     
     deinit {
-        self.delegate = nil
-        self.previewDelegate = nil
-        self.deviceDelegate = nil
-        self.flashDelegate = nil
-        self.videoDelegate = nil
-        self.photoDelegate = nil
-        
-        self.removeApplicationObservers()
-        self.removeSessionObservers()
-        self.removeDeviceObservers()
-        
-        if let session = self._captureSession {
-            self.beginConfiguration()
-            self.removeInputs(session: session)
-            self.removeOutputs(session: session)
-            self.commitConfiguration()
-        }
-        
-        self.previewLayer.session = nil
-        
-        self._currentDevice = nil
-        self._ciContext = nil
-        
-        self._recordingSession = nil
-        self._captureSession = nil
+        deinitthings()
     }
 }
 
 // MARK: - authorization
 
 extension NextLevel {
-  
+    
 
     /// Checks the current authorization status for the desired media type.
     ///
@@ -2381,14 +2357,42 @@ extension NextLevel {
     
     /// Initiates video recording, managed as a clip within the 'NextLevelSession'
     public func record() {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
+//        self.executeClosureSyncOnSessionQueueIfNecessary {
             self._recording = true
             if let _ = self._recordingSession {
                 self.beginRecordingNewClipIfNecessary()
             }
-        }
+//        }
     }
+    
+    public func deinitthings() {
+        self.delegate = nil
+        self.previewDelegate = nil
+        self.deviceDelegate = nil
+        self.flashDelegate = nil
+        self.videoDelegate = nil
+        self.photoDelegate = nil
         
+        self.removeApplicationObservers()
+        self.removeSessionObservers()
+        self.removeDeviceObservers()
+        
+        if let session = self._captureSession {
+            self.beginConfiguration()
+            self.removeInputs(session: session)
+            self.removeOutputs(session: session)
+            self.commitConfiguration()
+        }
+        
+        self.previewLayer.session = nil
+        
+        self._currentDevice = nil
+        self._ciContext = nil
+        
+        self._recordingSession = nil
+        self._captureSession = nil
+    }
+    
     /// Pauses video recording, preparing 'NextLevel' to start a new clip with 'record()' with completion handler.
     ///
     /// - Parameter completionHandler: Completion handler for when pause completes
@@ -3064,14 +3068,14 @@ extension NextLevel {
     }
     
     internal func removeKeyValueObservers(_ currentDevice: AVCaptureDevice) {
-//            currentDevice.removeObserver(self, forKeyPath: "adjustingFocus")
-//            currentDevice.removeObserver(self, forKeyPath: "adjustingExposure")
-//            currentDevice.removeObserver(self, forKeyPath: "adjustingWhiteBalance")
-//            currentDevice.removeObserver(self, forKeyPath: "flashAvailable")
-//            currentDevice.removeObserver(self, forKeyPath: "torchAvailable")
-//            currentDevice.removeObserver(self, forKeyPath: "flashActive")
-//            currentDevice.removeObserver(self, forKeyPath: "torchActive")
-//            currentDevice.removeObserver(self, forKeyPath: "videoZoomFactor")
+            currentDevice.removeObserver(self, forKeyPath: "adjustingFocus")
+            currentDevice.removeObserver(self, forKeyPath: "adjustingExposure")
+            currentDevice.removeObserver(self, forKeyPath: "adjustingWhiteBalance")
+            currentDevice.removeObserver(self, forKeyPath: "flashAvailable")
+            currentDevice.removeObserver(self, forKeyPath: "torchAvailable")
+            currentDevice.removeObserver(self, forKeyPath: "flashActive")
+            currentDevice.removeObserver(self, forKeyPath: "torchActive")
+            currentDevice.removeObserver(self, forKeyPath: "videoZoomFactor")
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
