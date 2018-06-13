@@ -562,7 +562,7 @@ extension NextLevelSession {
     ///
     /// - Parameter completionHandler: Handler for when a clip is finalized or finalization fails
     public func endClip(completionHandler: NextLevelSessionEndClipCompletionHandler?) {
-        self.executeClosureSyncOnSessionQueueIfNecessary {
+        self.executeClosureAsyncOnSessionQueueIfNecessary {
             self._audioQueue.sync {
                 if self.clipStarted {
                     self._clipStarted = false
@@ -581,7 +581,7 @@ extension NextLevelSession {
                             }
                             
                         } else {
-                            writer.endSession(atSourceTime: (self._currentClipDuration + self._startTimestamp))
+                            writer.endSession(atSourceTime: (self._currentClipDuration + self._lastAudioTimestamp))
                             writer.finishWriting(completionHandler: {
                                 // TODO support info dictionaries
                                 self.appendClip(withClipURL: writer.outputURL, infoDict: nil, error: writer.error, completionHandler: completionHandler)

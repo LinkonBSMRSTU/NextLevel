@@ -614,7 +614,7 @@ public class NextLevel: NSObject {
     // audio configuration
     
     /// Indicates whether the capture session automatically changes settings in the app’s shared audio session. By default, is `true`.
-    public var automaticallyConfiguresApplicationAudioSession: Bool = true
+    public var automaticallyConfiguresApplicationAudioSession: Bool = false
     
     // camera configuration
     
@@ -741,7 +741,7 @@ public class NextLevel: NSObject {
     
     // AVFoundation
     
-    internal var _captureSession: AVCaptureSession?
+    public var _captureSession: AVCaptureSession?
     
     internal var _videoInput: AVCaptureDeviceInput?
     internal var _frontCameraInput: AVCaptureDeviceInput?
@@ -752,7 +752,7 @@ public class NextLevel: NSObject {
     internal var _audioOutput: AVCaptureAudioDataOutput?
     internal var _photoOutput: AVCapturePhotoOutput?
     
-    internal var _currentDevice: AVCaptureDevice?
+    public var _currentDevice: AVCaptureDevice?
     internal var _requestedDevice: AVCaptureDevice?
     
     internal var _lastVideoFrame: CMSampleBuffer?
@@ -1194,7 +1194,7 @@ extension NextLevel {
             if let currentDeviceInput = AVCaptureDeviceInput.deviceInput(withMediaType: mediaType, captureSession: session) {
                 session.removeInput(currentDeviceInput)
                 if currentDeviceInput.device.hasMediaType(AVMediaType.video) {
-                    self.removeKeyValueObservers(currentDeviceInput.device)
+//                    self.removeKeyValueObservers(currentDeviceInput.device)
                 }
             }
             
@@ -1228,7 +1228,7 @@ extension NextLevel {
             for input in inputs {
                 session.removeInput(input)
                 if input.device.hasMediaType(AVMediaType.video) {
-                    self.removeKeyValueObservers(input.device)
+//                    self.removeKeyValueObservers(input.device)
                 }
             }
             self._videoInput = nil
@@ -2061,40 +2061,43 @@ extension NextLevel {
     /// Triggers a camera device position change.
     public func flipCaptureDevicePosition() {
         switchCameraAnimation()
-        _captureSession?.stopRunning()
-        if self.devicePosition == .back{
-            do{
-              _captureSession?.removeInput(_videoInput!)
-                _videoInput = nil
-                try _videoInput = AVCaptureDeviceInput(device:AVCaptureDevice.primaryVideoDevice(forPosition: .front)!)
-                self._captureSession?.addInput(_videoInput!)
-                 self.updateVideoOrientation()
-                self._captureSession?.startRunning()
-               
-                self.devicePosition = .front
-            }
-            catch _ {
-               print("Capture Session Error")
-            }
-        }else{
-            do{
-                _captureSession?.removeInput(_videoInput!)
-                _videoInput = nil
-                try _videoInput = AVCaptureDeviceInput(device:AVCaptureDevice.primaryVideoDevice(forPosition: .back)!)
-                self._captureSession?.addInput(_videoInput!)
-                self.updateVideoOrientation()
-                self._captureSession?.startRunning()
-                self.devicePosition = .back
-            }
-            catch _ {
-                print("Capture Session Error")
+        if let session = self._captureSession {
+            self.executeClosureAsyncOnSessionQueueIfNecessary {
+                    if self.devicePosition == .back {
+                        do {
+                            session.beginConfiguration()
+                            session.removeInput(self._videoInput!)
+                            self._videoInput = nil
+                            try self._videoInput = AVCaptureDeviceInput(device:AVCaptureDevice.primaryVideoDevice(forPosition: .front)!)
+                            session.addInput(self._videoInput!)
+                            self.updateVideoOrientation()
+                            session.commitConfiguration()
+                            session.startRunning()
+                            self.devicePosition = .front
+                        }
+                        catch _ {
+                            print("Capture Session Error")
+                        }
+                    } else {
+                        do {
+                            session.removeInput(self._videoInput!)
+                            self._videoInput = nil
+                            try self._videoInput = AVCaptureDeviceInput(device:AVCaptureDevice.primaryVideoDevice(forPosition: .back)!)
+                            session.addInput(self._videoInput!)
+                            self.updateVideoOrientation()
+                            session.startRunning()
+                            self.devicePosition = .back
+                        }
+                        catch _ {
+                            print("Capture Session Error")
+                        }
+                }
             }
         }
-        
     }
     func switchCameraAnimation() {
         let filpAnimation = CATransition()
-        filpAnimation.duration = 0.1
+        filpAnimation.duration = 0.7
         filpAnimation.type = "oglFlip"
         filpAnimation.subtype = kCATransitionFromRight
         previewLayer.add(filpAnimation, forKey: "filpAnimation")
@@ -2399,7 +2402,7 @@ extension NextLevel {
     public func pause(withCompletionHandler completionHandler: (() -> Void)? = nil) {
         self._recording = false
         
-        self.executeClosureAsyncOnSessionQueueIfNecessary {
+        self.executeClosureAsyncOnMainQueueIfNecessary {
             if let session = self._recordingSession {
                 if session.clipStarted {
                     session.endClip(completionHandler: { (sessionClip: NextLevelClip?, error: Error?) in
@@ -3065,17 +3068,6 @@ extension NextLevel {
         currentDevice.addObserver(self, forKeyPath: "torchActive", options: [.new], context: &NextLevelTorchActiveObserverContext)
         currentDevice.addObserver(self, forKeyPath: "videoZoomFactor", options: [.new], context: &NextLevelVideoZoomFactorObserverContext)
         isObserverAdded = true
-    }
-    
-    internal func removeKeyValueObservers(_ currentDevice: AVCaptureDevice) {
-            currentDevice.removeObserver(self, forKeyPath: "adjustingFocus")
-            currentDevice.removeObserver(self, forKeyPath: "adjustingExposure")
-            currentDevice.removeObserver(self, forKeyPath: "adjustingWhiteBalance")
-            currentDevice.removeObserver(self, forKeyPath: "flashAvailable")
-            currentDevice.removeObserver(self, forKeyPath: "torchAvailable")
-            currentDevice.removeObserver(self, forKeyPath: "flashActive")
-            currentDevice.removeObserver(self, forKeyPath: "torchActive")
-            currentDevice.removeObserver(self, forKeyPath: "videoZoomFactor")
     }
     
     public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
