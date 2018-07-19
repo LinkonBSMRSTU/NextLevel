@@ -2097,7 +2097,7 @@ extension NextLevel {
     }
     func switchCameraAnimation() {
         let filpAnimation = CATransition()
-        filpAnimation.duration = 0.7
+        filpAnimation.duration = 0.4
         filpAnimation.type = "oglFlip"
         filpAnimation.subtype = kCATransitionFromRight
         previewLayer.add(filpAnimation, forKey: "filpAnimation")
