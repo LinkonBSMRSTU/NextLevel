@@ -766,6 +766,7 @@ public class NextLevel: NSObject {
     internal var _lastARFrame: CVPixelBuffer?
     internal var isObserverAdded = false
     
+    public var recordingOrintation : AVCaptureVideoOrientation = AVCaptureVideoOrientation.portrait
     // MARK: - singleton
     
     /// Method for providing a NextLevel singleton. This isn't required for use.
@@ -2115,7 +2116,7 @@ extension NextLevel {
         }
     }
     
-    internal func updateVideoOrientation() {
+    public func updateVideoOrientation() {
         if let session = self._recordingSession {
             if session.currentClipHasAudio == false && session.currentClipHasVideo == false {
                 session.reset()
@@ -2123,14 +2124,14 @@ extension NextLevel {
         }
         
         var didChangeOrientation = false
-        let currentOrientation = AVCaptureVideoOrientation.avorientationFromUIDeviceOrientation(UIDevice.current.orientation)
+        let currentOrientation = recordingOrintation
         
-        if let previewConnection = self.previewLayer.connection {
-            if previewConnection.isVideoOrientationSupported && previewConnection.videoOrientation != currentOrientation {
-                previewConnection.videoOrientation = currentOrientation
-                didChangeOrientation = true
-            }
-        }
+        //        if let previewConnection = self.previewLayer.connection {
+        //            if previewConnection.isVideoOrientationSupported && previewConnection.videoOrientation != currentOrientation {
+        //                previewConnection.videoOrientation = currentOrientation
+        //                didChangeOrientation = true
+        //            }
+        //        }
         
         if let videoOutput = self._videoOutput, let videoConnection = videoOutput.connection(with: AVMediaType.video) {
             if videoConnection.isVideoOrientationSupported && videoConnection.videoOrientation != currentOrientation {
@@ -2360,12 +2361,15 @@ extension NextLevel {
     
     /// Initiates video recording, managed as a clip within the 'NextLevelSession'
     public func record() {
-//        self.executeClosureSyncOnSessionQueueIfNecessary {
+        // self.executeClosureSyncOnSessionQueueIfNecessary {
+        self.updateVideoOrientation()
+        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1), execute: {
             self._recording = true
             if let _ = self._recordingSession {
                 self.beginRecordingNewClipIfNecessary()
             }
-//        }
+        })
+        // }
     }
     
     public func deinitthings() {
