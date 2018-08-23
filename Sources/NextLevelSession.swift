@@ -581,7 +581,7 @@ extension NextLevelSession {
                             }
                             
                         } else {
-                            writer.endSession(atSourceTime: (self._currentClipDuration + self._lastAudioTimestamp))
+                            writer.endSession(atSourceTime: (self._currentClipDuration + self._startTimestamp))
                             writer.finishWriting(completionHandler: {
                                 // TODO support info dictionaries
                                 self.appendClip(withClipURL: writer.outputURL, infoDict: nil, error: writer.error, completionHandler: completionHandler)
